@@ -62,7 +62,7 @@
                  class="w-full bg-[#f0f2f0] border-none rounded-lg py-3 pl-10 pr-4 text-base focus:outline-none focus:ring-2 focus:ring-[#8b9693] transition-all">
         </div>
         
-        <!-- 2. 樓層選擇 (直接展開，無需彈出視窗) -->
+        <!-- 2. 樓層選擇 (直接展開) -->
         <div class="grid grid-cols-5 gap-2">
           <label class="cursor-pointer">
             <input type="radio" name="floor" value="1F" class="peer hidden">
@@ -98,7 +98,6 @@
     <div>
       <label class="block text-sm font-medium mb-1">工程狀態</label>
       <div class="flex gap-2">
-        <!-- 預設為洗前狀態 -->
         <button id="btnBefore" onclick="setStatus('洗前')" class="flex-1 py-3 rounded-lg text-white font-medium transition-all bg-[#a67c76] shadow-md">
           洗前
         </button>
@@ -111,29 +110,35 @@
 
   <!-- 相機預覽區塊 -->
   <div class="relative w-full aspect-[3/4] bg-black rounded-xl overflow-hidden shadow-sm flex-shrink-0">
-    <!-- 提示訊息 -->
     <div id="cameraStatus" class="absolute inset-0 flex items-center justify-center text-white text-sm z-10">
       載入相機中...
     </div>
     <video id="cameraFeed" class="absolute inset-0 w-full h-full object-cover z-20" autoplay playsinline></video>
     
-    <!-- 閃光燈開關 (預設隱藏，硬體支援時顯示) -->
+    <!-- 網頁原生閃光燈開關 (若硬體支援網頁控制才會顯示於右上角) -->
     <button id="flashBtn" onclick="toggleFlash()" class="hidden absolute top-4 right-4 w-10 h-10 bg-black/40 backdrop-blur-sm rounded-full items-center justify-center z-30 text-white border border-white/30 transition-colors">
       <i data-lucide="zap" class="w-5 h-5"></i>
     </button>
 
-    <!-- 縮放控制 (預設隱藏，硬體支援時顯示) -->
+    <!-- 縮放控制 (若硬體支援則顯示) -->
     <div id="zoomContainer" class="hidden absolute bottom-44 left-1/2 -translate-x-1/2 w-3/4 bg-black/40 backdrop-blur-sm px-4 py-3 rounded-full items-center gap-3 z-30 border border-white/30">
       <i data-lucide="zoom-out" class="w-4 h-4 text-white flex-shrink-0"></i>
       <input type="range" id="zoomSlider" oninput="handleZoom(event)" class="w-full">
       <i data-lucide="zoom-in" class="w-4 h-4 text-white flex-shrink-0"></i>
     </div>
 
-    <!-- 快門按鈕 -->
+    <!-- 一般連拍快門 (中央) -->
     <button id="captureBtn" onclick="takePhoto()" 
             class="absolute bottom-20 left-1/2 -translate-x-1/2 w-16 h-16 bg-white/90 backdrop-blur-sm rounded-full border-4 border-white flex items-center justify-center z-30 shadow-xl active:scale-95 transition-all">
       <i data-lucide="camera" class="w-7 h-7 text-[#4a5553]"></i>
     </button>
+
+    <!-- 【新增】手機原生相機備用方案 (右下角，確保一定能開閃光燈) -->
+    <label for="nativeCameraInput" class="absolute bottom-20 right-4 w-14 h-14 bg-black/50 backdrop-blur-sm rounded-full flex flex-col items-center justify-center z-30 text-white border border-white/40 shadow-lg cursor-pointer active:scale-95 transition-all">
+      <i data-lucide="zap" class="w-5 h-5 text-yellow-300"></i>
+      <span class="text-[9px] mt-1 font-medium">需閃光</span>
+    </label>
+    <input type="file" id="nativeCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleNativePhoto(event)">
   </div>
 
   <!-- 拍攝歷史紀錄 -->
@@ -151,7 +156,6 @@
   <canvas id="canvas" class="hidden"></canvas>
 
   <script>
-    // 初始化圖示
     lucide.createIcons();
 
     let currentStatus = '洗前';
@@ -163,17 +167,14 @@
     const ctx = canvas.getContext('2d');
     const cameraStatus = document.getElementById('cameraStatus');
 
-    // 頁面重整時，確保清空所有輸入框與選擇
     window.addEventListener('load', () => {
       document.getElementById('addressInput').value = '';
       document.getElementById('positionInput').value = '';
       const checkedFloor = document.querySelector('input[name="floor"]:checked');
       if(checkedFloor) checkedFloor.checked = false;
-      
-      startCamera(); // 啟動相機
+      startCamera();
     });
 
-    // 設定狀態按鈕樣式切換 (顏色連動)
     function setStatus(status) {
       currentStatus = status;
       const btnBefore = document.getElementById('btnBefore');
@@ -188,7 +189,6 @@
       }
     }
 
-    // 啟動手機後置鏡頭
     async function startCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -204,7 +204,7 @@
         
         video.onloadedmetadata = () => {
           cameraStatus.style.display = 'none';
-          checkCameraCapabilities(); // 檢查並啟用閃光燈/縮放功能
+          checkCameraCapabilities(); 
         };
       } catch (err) {
         console.error("相機存取失敗:", err);
@@ -212,34 +212,27 @@
       }
     }
 
-    // 偵測硬體是否支援閃光燈與縮放
     function checkCameraCapabilities() {
       if (!videoTrack) return;
-      
-      // 確保在部分瀏覽器中需要延遲才能正確取得 capabilities
       setTimeout(() => {
         try {
           const capabilities = videoTrack.getCapabilities();
           
-          // 閃光燈支援判斷
           const flashBtn = document.getElementById('flashBtn');
           if (capabilities.torch) {
             flashBtn.classList.remove('hidden');
             flashBtn.classList.add('flex');
           }
 
-          // 縮放支援判斷
           const zoomContainer = document.getElementById('zoomContainer');
           const zoomSlider = document.getElementById('zoomSlider');
           if (capabilities.zoom) {
             zoomContainer.classList.remove('hidden');
             zoomContainer.classList.add('flex');
-            
-            // 設定滑桿範圍
             zoomSlider.min = capabilities.zoom.min;
             zoomSlider.max = capabilities.zoom.max;
             zoomSlider.step = capabilities.zoom.step;
-            zoomSlider.value = capabilities.zoom.min; // 預設最小倍率
+            zoomSlider.value = capabilities.zoom.min;
           }
         } catch (e) {
           console.warn("無法取得相機進階功能", e);
@@ -247,17 +240,13 @@
       }, 500);
     }
 
-    // 切換閃光燈
     async function toggleFlash() {
       if (!videoTrack) return;
       isFlashOn = !isFlashOn;
-      
       try {
         await videoTrack.applyConstraints({
           advanced: [{ torch: isFlashOn }]
         });
-        
-        // 更新按鈕外觀與圖示
         const flashBtn = document.getElementById('flashBtn');
         if (isFlashOn) {
           flashBtn.className = 'absolute top-4 right-4 w-10 h-10 bg-white rounded-full flex items-center justify-center z-30 text-[#4a5553] shadow-md transition-colors';
@@ -272,7 +261,6 @@
       }
     }
 
-    // 處理縮放
     async function handleZoom(e) {
       if (!videoTrack) return;
       try {
@@ -284,7 +272,6 @@
       }
     }
 
-    // 取得民國年時間字串
     function getROCTimeString() {
       const now = new Date();
       const rocYear = now.getFullYear() - 1911;
@@ -295,10 +282,8 @@
       return `民國${rocYear}年${month}月${date}日 ${hours}:${minutes}`;
     }
 
-    // 拍照並合成浮水印
-    function takePhoto() {
-      if (!video.videoWidth) return;
-
+    // 核心浮水印繪製與下載功能 (給兩種拍攝方式共用)
+    function processAndDownloadImage(sourceCanvas) {
       const address = document.getElementById('addressInput').value.trim();
       const floorInput = document.querySelector('input[name="floor"]:checked');
       const floor = floorInput ? floorInput.value : '';
@@ -307,11 +292,7 @@
       const location = [address, floor, position].filter(Boolean).join(' ') || '未指定地點';
       const timeStr = getROCTimeString();
 
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      const fontSize = Math.max(Math.floor(canvas.width * 0.035), 24);
+      const fontSize = Math.max(Math.floor(sourceCanvas.width * 0.035), 24);
       const padding = fontSize;
       const lineHeight = fontSize * 1.4;
       
@@ -331,7 +312,7 @@
       const boxWidth = maxWidth + (padding * 2);
       const boxHeight = (textLines.length * lineHeight) + padding;
       const startX = padding;
-      const startY = canvas.height - boxHeight - padding;
+      const startY = sourceCanvas.height - boxHeight - padding;
 
       if (currentStatus === '洗前') {
         ctx.fillStyle = 'rgba(166, 124, 118, 0.85)';
@@ -349,7 +330,7 @@
         ctx.fillText(line, startX + padding, startY + (padding/2) + (index * lineHeight) + 4);
       });
 
-      const photoDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      const photoDataUrl = sourceCanvas.toDataURL('image/jpeg', 0.9);
       const baseTime = timeStr.replace(/[\s:]/g, '');
       const uniqueMs = String(new Date().getMilliseconds()).padStart(3, '0');
       const uniqueFileName = `${baseTime}_${uniqueMs}`;
@@ -357,7 +338,35 @@
       downloadAndDisplay(photoDataUrl, currentStatus, uniqueFileName);
     }
 
-    // 處理下載與產生縮圖
+    // 方法A：網頁極速連拍
+    function takePhoto() {
+      if (!video.videoWidth) return;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      processAndDownloadImage(canvas);
+    }
+
+    // 方法B：呼叫原生相機拍攝 (處理回傳的相片)
+    function handleNativePhoto(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          processAndDownloadImage(canvas);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+      event.target.value = ''; // 清空欄位以便可以重複拍攝
+    }
+
     function downloadAndDisplay(dataUrl, status, uniqueFileName) {
       const link = document.createElement('a');
       link.href = dataUrl;
