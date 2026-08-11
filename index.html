@@ -32,16 +32,23 @@
       color: white;
       border-color: #89938B;
     }
+    /* 隱藏滾動條但保持可滾動 */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
   </style>
 </head>
 <body class="min-h-screen p-4 md:p-8 flex justify-center">
 
   <div class="w-full max-w-md bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col gap-6 h-fit">
     
-    <!-- 標題 -->
     <header class="flex items-center gap-2 border-b border-gray-100 pb-4">
       <i data-lucide="camera" class="w-6 h-6 text-[#89938B]"></i>
-      <h1 class="text-xl font-bold text-gray-800">現場拍攝紀錄</h1>
+      <h1 class="text-xl font-bold text-gray-800">現場連續拍攝紀錄</h1>
     </header>
 
     <!-- 狀態選擇 (洗前/洗後) -->
@@ -68,49 +75,55 @@
       <label for="locationInput" class="font-medium text-sm text-gray-600">拍攝地點</label>
       <div class="relative">
         <i data-lucide="map-pin" class="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-        <input type="text" id="locationInput" placeholder="請輸入或選擇地點" 
-               class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#89938B] focus:border-transparent w-full box-border">
+        <input type="text" id="locationInput" placeholder="請輸入地點" 
+               class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#89938B] focus:border-transparent box-border">
       </div>
     </div>
 
-    <!-- 時間顯示 (自動抓取民國年) -->
+    <!-- 時間輸入 (改為手動輸入民國年) -->
     <div class="flex flex-col gap-2">
-      <label class="font-medium text-sm text-gray-600">拍攝時間</label>
-      <div class="flex items-center gap-2 text-gray-700 bg-gray-50 p-2 rounded-lg border border-gray-100">
-        <i data-lucide="clock" class="w-5 h-5 text-gray-400"></i>
-        <span id="currentTimeDisplay" class="text-sm">載入中...</span>
+      <label for="timeInput" class="font-medium text-sm text-gray-600">拍攝時間 (可手動修改)</label>
+      <div class="relative">
+        <i data-lucide="clock" class="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+        <input type="text" id="timeInput" 
+               class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#89938B] focus:border-transparent box-border">
       </div>
     </div>
 
-    <!-- 拍攝與圖片預覽區 -->
+    <!-- 隱藏的 Canvas 用來合成圖片 -->
+    <canvas id="photoCanvas" class="hidden"></canvas>
+
     <div class="flex flex-col gap-4 mt-2">
+      <!-- 連續拍攝按鈕 -->
       <label for="cameraInput" class="btn-primary text-white text-center py-3 rounded-lg cursor-pointer flex items-center justify-center gap-2 shadow-sm w-full">
         <i data-lucide="aperture" class="w-5 h-5"></i>
-        <span>開啟相機拍攝</span>
+        <span>開啟相機拍攝 (可連續)</span>
       </label>
       <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden">
-
-      <!-- 隱藏的 Canvas 用來合成圖片 -->
-      <canvas id="photoCanvas" class="hidden"></canvas>
       
-      <!-- 預覽圖 -->
-      <div id="previewContainer" class="hidden flex-col gap-4">
-        <img id="imagePreview" class="w-full rounded-lg shadow-sm border border-gray-200" alt="拍攝預覽">
-        <button id="downloadBtn" class="btn-secondary text-white text-center py-3 rounded-lg flex items-center justify-center gap-2 shadow-sm w-full">
-          <i data-lucide="download" class="w-5 h-5"></i>
-          <span>儲存合成照片至手機</span>
+      <!-- 拍攝照片清單預覽區 -->
+      <div id="photoGallery" class="grid grid-cols-2 gap-3 hidden">
+        <!-- 縮圖會動態新增於此 -->
+      </div>
+
+      <!-- 一鍵儲存區域 -->
+      <div id="actionArea" class="hidden flex-col gap-2 mt-2">
+        <button id="saveAllBtn" class="btn-secondary text-white text-center py-3 rounded-lg flex items-center justify-center gap-2 shadow-sm w-full">
+          <i data-lucide="download-cloud" class="w-5 h-5"></i>
+          <span>確認並儲存全部照片 (<span id="photoCount">0</span>)</span>
         </button>
+        <div id="saveStatus" class="text-center text-sm font-medium text-[#89938B] h-5 transition-opacity opacity-0">
+          照片儲存完畢！
+        </div>
       </div>
     </div>
 
   </div>
 
   <script>
-    // 初始化圖示
     lucide.createIcons();
 
-    // 時間處理：獲取當前民國年時間
-    function getRocTimeString() {
+    function getInitRocTimeString() {
       const now = new Date();
       const rocYear = now.getFullYear() - 1911;
       const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -120,25 +133,21 @@
       return `民國${rocYear}年${month}月${date}日 ${hours}:${minutes}`;
     }
 
-    // 更新畫面時間顯示
-    const timeDisplay = document.getElementById('currentTimeDisplay');
-    timeDisplay.textContent = getRocTimeString();
-    
-    // 每分鐘更新一次時間顯示
-    setInterval(() => {
-      timeDisplay.textContent = getRocTimeString();
-    }, 60000);
+    // 初始化手動時間輸入框
+    document.getElementById('timeInput').value = getInitRocTimeString();
 
     const cameraInput = document.getElementById('cameraInput');
     const photoCanvas = document.getElementById('photoCanvas');
     const ctx = photoCanvas.getContext('2d');
-    const imagePreview = document.getElementById('imagePreview');
-    const previewContainer = document.getElementById('previewContainer');
-    const downloadBtn = document.getElementById('downloadBtn');
+    const photoGallery = document.getElementById('photoGallery');
+    const actionArea = document.getElementById('actionArea');
+    const saveAllBtn = document.getElementById('saveAllBtn');
+    const photoCountDisplay = document.getElementById('photoCount');
+    const saveStatus = document.getElementById('saveStatus');
     
-    let currentImageObj = null;
+    // 儲存已處理好的合成圖片 DataURL 陣列
+    let capturedPhotos = [];
 
-    // 處理照片上傳/拍攝
     cameraInput.addEventListener('change', function(e) {
       const file = e.target.files[0];
       if (!file) return;
@@ -147,35 +156,28 @@
       reader.onload = function(event) {
         const img = new Image();
         img.onload = function() {
-          currentImageObj = img;
-          processAndPreviewImage();
+          processAndStoreImage(img);
         }
         img.src = event.target.result;
       }
       reader.readAsDataURL(file);
+      
+      // 清空 input value，確保連續拍攝相同檔案也能觸發 change 事件
+      e.target.value = '';
     });
 
-    // 將資料繪製到 Canvas 並產生預覽
-    function processAndPreviewImage() {
-      if (!currentImageObj) return;
+    function processAndStoreImage(img) {
+      photoCanvas.width = img.width;
+      photoCanvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
 
-      // 設定 Canvas 尺寸為原圖大小
-      photoCanvas.width = currentImageObj.width;
-      photoCanvas.height = currentImageObj.height;
-
-      // 繪製原圖
-      ctx.drawImage(currentImageObj, 0, 0);
-
-      // 取得使用者輸入的資料
       const locationInfo = document.getElementById('locationInput').value || '未填寫地點';
-      const timeInfo = getRocTimeString();
+      const timeInfo = document.getElementById('timeInput').value || '未填寫時間';
       const statusInfo = document.querySelector('input[name="status"]:checked').value;
 
-      // 設定浮水印樣式（自適應照片大小）
       const fontSize = Math.max(photoCanvas.height * 0.03, 24);
       ctx.font = `bold ${fontSize}px "Noto Sans TC", sans-serif`;
       
-      // 繪製半透明黑色背景底色，讓文字更清楚
       const padding = fontSize * 0.5;
       const textX = padding * 2;
       const textY = photoCanvas.height - (fontSize * 4) - padding * 2;
@@ -183,36 +185,73 @@
       ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
       ctx.fillRect(0, textY - padding, photoCanvas.width, (fontSize * 4.5) + padding * 2);
 
-      // 繪製文字
       ctx.fillStyle = '#FFFFFF';
       ctx.fillText(`階段：${statusInfo}`, textX, textY + fontSize);
       ctx.fillText(`地點：${locationInfo}`, textX, textY + (fontSize * 2.5));
       ctx.fillText(`時間：${timeInfo}`, textX, textY + (fontSize * 4));
 
-      // 將 Canvas 轉換為圖片顯示在畫面上
-      imagePreview.src = photoCanvas.toDataURL('image/jpeg', 0.9);
-      previewContainer.classList.remove('hidden');
-      previewContainer.classList.add('flex');
+      const finalDataUrl = photoCanvas.toDataURL('image/jpeg', 0.9);
+      capturedPhotos.push({
+        dataUrl: finalDataUrl,
+        timestamp: Date.now()
+      });
+
+      renderGallery();
     }
 
-    // 監聽輸入改變時，如果已經有照片就重新渲染浮水印
-    document.getElementById('locationInput').addEventListener('input', () => {
-      if (currentImageObj) processAndPreviewImage();
-    });
-    const radios = document.querySelectorAll('input[name="status"]');
-    radios.forEach(radio => {
-      radio.addEventListener('change', () => {
-        if (currentImageObj) processAndPreviewImage();
-      });
-    });
+    function renderGallery() {
+      if (capturedPhotos.length > 0) {
+        photoGallery.classList.remove('hidden');
+        actionArea.classList.remove('hidden');
+        actionArea.classList.add('flex');
+        photoCountDisplay.textContent = capturedPhotos.length;
+        
+        photoGallery.innerHTML = '';
+        capturedPhotos.forEach((photo, index) => {
+          const imgEl = document.createElement('img');
+          imgEl.src = photo.dataUrl;
+          imgEl.className = 'w-full h-24 object-cover rounded-lg shadow-sm border border-gray-200';
+          photoGallery.appendChild(imgEl);
+        });
+      }
+    }
 
-    // 下載圖片
-    downloadBtn.addEventListener('click', () => {
-      const dataURL = photoCanvas.toDataURL('image/jpeg', 0.9);
-      const link = document.createElement('a');
-      link.download = `現場紀錄_${getRocTimeString().replace(/\s/g, '_')}.jpg`;
-      link.href = dataURL;
-      link.click();
+    saveAllBtn.addEventListener('click', () => {
+      if (capturedPhotos.length === 0) return;
+
+      // 替換掉按鈕文字顯示儲存中
+      const originalText = saveAllBtn.innerHTML;
+      saveAllBtn.innerHTML = '<i data-lucide="loader" class="w-5 h-5 animate-spin"></i><span>處理中...</span>';
+      lucide.createIcons();
+
+      // 利用延遲依序觸發下載，避免瀏覽器阻擋多重檔案下載
+      capturedPhotos.forEach((photo, index) => {
+        setTimeout(() => {
+          const link = document.createElement('a');
+          link.download = `現場紀錄_${index + 1}_${photo.timestamp}.jpg`;
+          link.href = photo.dataUrl;
+          link.click();
+
+          // 處理最後一張時恢復按鈕狀態，並以文字展開提示取代彈出視窗
+          if (index === capturedPhotos.length - 1) {
+            saveAllBtn.innerHTML = originalText;
+            lucide.createIcons();
+            saveStatus.classList.remove('opacity-0');
+            saveStatus.classList.add('opacity-100');
+            
+            // 3秒後隱藏成功提示，並清空陣列準備下一輪拍攝
+            setTimeout(() => {
+              saveStatus.classList.remove('opacity-100');
+              saveStatus.classList.add('opacity-0');
+              capturedPhotos = [];
+              photoGallery.innerHTML = '';
+              photoGallery.classList.add('hidden');
+              actionArea.classList.add('hidden');
+              actionArea.classList.remove('flex');
+            }, 3000);
+          }
+        }, index * 400); // 每張間隔 0.4 秒
+      });
     });
   </script>
 </body>
