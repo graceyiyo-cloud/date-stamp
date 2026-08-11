@@ -3,153 +3,177 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>工程紀錄拍攝工具</title>
+  <title>工程紀錄相機</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+    :root {
+      /* 基礎色系 */
+      --bg-base: #f0f2f0;
+      --text-main: #4a5553;
+      /* 狀態專屬辨識色 (莫蘭迪色系) */
+      --color-before: #a67c76; /* 洗前：粉褐 */
+      --color-after: #6b8e85;  /* 洗後：藍綠 */
+    }
     body {
-      font-family: 'Noto Sans TC', sans-serif;
-      background-color: #F5F5F0;
-      color: #3C3C3C;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-style: normal;
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      -webkit-tap-highlight-color: transparent;
     }
-    .btn-primary {
-      background-color: #89938B;
-      transition: background-color 0.2s ease;
-    }
-    .btn-primary:hover {
-      background-color: #727B74;
-    }
-    .btn-secondary {
-      background-color: #B2A59A;
-      transition: background-color 0.2s ease;
-    }
-    .btn-secondary:hover {
-      background-color: #9C9086;
-    }
-    input[type="radio"]:checked + div {
-      background-color: #89938B;
-      color: white;
-      border-color: #89938B;
-    }
-    .no-scrollbar::-webkit-scrollbar {
-      display: none;
-    }
-    .no-scrollbar {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
+    /* 隱藏預設捲軸讓畫面更乾淨 */
+    ::-webkit-scrollbar { width: 0px; background: transparent; }
   </style>
 </head>
-<body class="min-h-screen p-4 md:p-8 flex justify-center">
+<body class="min-h-screen flex flex-col max-w-md mx-auto p-4 gap-4 pb-24">
 
-  <div class="w-full max-w-md bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex flex-col gap-6 h-fit">
-    
-    <header class="flex items-center gap-2 border-b border-gray-100 pb-4">
-      <i data-lucide="camera" class="w-6 h-6 text-[#89938B]"></i>
-      <h1 class="text-xl font-bold text-gray-800">現場連續拍攝紀錄</h1>
-    </header>
+  <!-- 設定區塊 -->
+  <div class="bg-white p-4 rounded-xl shadow-sm flex flex-col gap-4">
+    <div>
+      <label class="block text-sm font-medium mb-2">拍攝地點</label>
+      <div class="flex flex-col gap-2">
+        <!-- 1. 地址輸入 -->
+        <div class="relative">
+          <i data-lucide="map-pin" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#8b9693]"></i>
+          <input type="text" id="addressInput" placeholder="輸入地址 (例如：幸福家湖美店)" autocomplete="off"
+                 class="w-full bg-[#f0f2f0] border-none rounded-lg py-3 pl-10 pr-4 text-base focus:outline-none focus:ring-2 focus:ring-[#8b9693] transition-all">
+        </div>
+        
+        <!-- 2. 樓層選擇 (直接展開，無需彈出視窗) -->
+        <div class="grid grid-cols-5 gap-2">
+          <label class="cursor-pointer">
+            <input type="radio" name="floor" value="1F" class="peer hidden">
+            <div class="text-center py-2 border border-[#e2e5e4] rounded-lg text-[#4a5553] text-sm font-medium peer-checked:bg-[#8b9693] peer-checked:text-white transition-colors">1F</div>
+          </label>
+          <label class="cursor-pointer">
+            <input type="radio" name="floor" value="2F" class="peer hidden">
+            <div class="text-center py-2 border border-[#e2e5e4] rounded-lg text-[#4a5553] text-sm font-medium peer-checked:bg-[#8b9693] peer-checked:text-white transition-colors">2F</div>
+          </label>
+          <label class="cursor-pointer">
+            <input type="radio" name="floor" value="3F" class="peer hidden">
+            <div class="text-center py-2 border border-[#e2e5e4] rounded-lg text-[#4a5553] text-sm font-medium peer-checked:bg-[#8b9693] peer-checked:text-white transition-colors">3F</div>
+          </label>
+          <label class="cursor-pointer">
+            <input type="radio" name="floor" value="4F" class="peer hidden">
+            <div class="text-center py-2 border border-[#e2e5e4] rounded-lg text-[#4a5553] text-sm font-medium peer-checked:bg-[#8b9693] peer-checked:text-white transition-colors">4F</div>
+          </label>
+          <label class="cursor-pointer">
+            <input type="radio" name="floor" value="5F" class="peer hidden">
+            <div class="text-center py-2 border border-[#e2e5e4] rounded-lg text-[#4a5553] text-sm font-medium peer-checked:bg-[#8b9693] peer-checked:text-white transition-colors">5F</div>
+          </label>
+        </div>
 
-    <!-- 狀態選擇 (洗前/洗後) -->
-    <div class="flex flex-col gap-2">
-      <label class="font-medium text-sm text-gray-600">紀錄階段</label>
-      <div class="flex gap-4">
-        <label class="cursor-pointer flex-1">
-          <input type="radio" name="status" value="洗前" class="hidden" checked>
-          <div class="text-center py-2 border border-gray-300 rounded-lg text-gray-600 font-medium hover:bg-gray-50 transition-colors">
-            洗前
-          </div>
-        </label>
-        <label class="cursor-pointer flex-1">
-          <input type="radio" name="status" value="洗後" class="hidden">
-          <div class="text-center py-2 border border-gray-300 rounded-lg text-gray-600 font-medium hover:bg-gray-50 transition-colors">
-            洗後
-          </div>
-        </label>
-      </div>
-    </div>
-
-    <!-- 地點組合輸入區 -->
-    <div class="flex flex-col gap-3 p-4 bg-gray-50 rounded-lg border border-gray-100">
-      <label class="font-medium text-sm text-gray-600 flex items-center gap-1">
-        <i data-lucide="map-pin" class="w-4 h-4 text-gray-400"></i> 地點資訊
-      </label>
-      
-      <!-- 1. 地址 -->
-      <input type="text" id="addressInput" placeholder="輸入地址 (例: 幸福家湖美店)" autocomplete="off"
-             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#89938B] focus:border-transparent box-border text-sm">
-      
-      <!-- 2. 樓層 (避免彈出視窗，改為按鈕列) -->
-      <div class="grid grid-cols-5 gap-2">
-        <label class="cursor-pointer">
-          <input type="radio" name="floor" value="1F" class="hidden">
-          <div class="text-center py-1.5 border border-gray-300 rounded-lg text-gray-600 text-sm font-medium hover:bg-gray-100 transition-colors">1F</div>
-        </label>
-        <label class="cursor-pointer">
-          <input type="radio" name="floor" value="2F" class="hidden">
-          <div class="text-center py-1.5 border border-gray-300 rounded-lg text-gray-600 text-sm font-medium hover:bg-gray-100 transition-colors">2F</div>
-        </label>
-        <label class="cursor-pointer">
-          <input type="radio" name="floor" value="3F" class="hidden">
-          <div class="text-center py-1.5 border border-gray-300 rounded-lg text-gray-600 text-sm font-medium hover:bg-gray-100 transition-colors">3F</div>
-        </label>
-        <label class="cursor-pointer">
-          <input type="radio" name="floor" value="4F" class="hidden">
-          <div class="text-center py-1.5 border border-gray-300 rounded-lg text-gray-600 text-sm font-medium hover:bg-gray-100 transition-colors">4F</div>
-        </label>
-        <label class="cursor-pointer">
-          <input type="radio" name="floor" value="5F" class="hidden">
-          <div class="text-center py-1.5 border border-gray-300 rounded-lg text-gray-600 text-sm font-medium hover:bg-gray-100 transition-colors">5F</div>
-        </label>
-      </div>
-
-      <!-- 3. 位置 -->
-      <input type="text" id="positionInput" placeholder="輸入位置 (例: 前)" autocomplete="off"
-             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#89938B] focus:border-transparent box-border text-sm">
-    </div>
-
-    <!-- 時間輸入 (手動輸入民國年) -->
-    <div class="flex flex-col gap-2">
-      <label for="timeInput" class="font-medium text-sm text-gray-600">拍攝時間 (可手動修改)</label>
-      <div class="relative">
-        <i data-lucide="clock" class="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
-        <input type="text" id="timeInput" autocomplete="off"
-               class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#89938B] focus:border-transparent box-border">
-      </div>
-    </div>
-
-    <!-- 隱藏的 Canvas 用來合成圖片 -->
-    <canvas id="photoCanvas" class="hidden"></canvas>
-
-    <div class="flex flex-col gap-4 mt-2">
-      <!-- 連續拍攝按鈕 -->
-      <label for="cameraInput" class="btn-primary text-white text-center py-3 rounded-lg cursor-pointer flex items-center justify-center gap-2 shadow-sm w-full">
-        <i data-lucide="aperture" class="w-5 h-5"></i>
-        <span>開啟相機拍攝 (可連續)</span>
-      </label>
-      <input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden">
-      
-      <!-- 拍攝照片清單預覽區 -->
-      <div id="photoGallery" class="grid grid-cols-2 gap-3 hidden"></div>
-
-      <!-- 一鍵儲存區域 -->
-      <div id="actionArea" class="hidden flex-col gap-2 mt-2">
-        <button id="saveAllBtn" class="btn-secondary text-white text-center py-3 rounded-lg flex items-center justify-center gap-2 shadow-sm w-full">
-          <i data-lucide="download-cloud" class="w-5 h-5"></i>
-          <span>確認並儲存全部照片 (<span id="photoCount">0</span>)</span>
-        </button>
-        <div id="saveStatus" class="text-center text-sm font-medium text-[#89938B] h-5 transition-opacity opacity-0">
-          照片儲存完畢！
+        <!-- 3. 位置輸入 -->
+        <div class="relative">
+          <i data-lucide="navigation" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#8b9693]"></i>
+          <input type="text" id="positionInput" placeholder="輸入位置 (例如：前)" autocomplete="off"
+                 class="w-full bg-[#f0f2f0] border-none rounded-lg py-3 pl-10 pr-4 text-base focus:outline-none focus:ring-2 focus:ring-[#8b9693] transition-all">
         </div>
       </div>
     </div>
-
+    
+    <div>
+      <label class="block text-sm font-medium mb-1">工程狀態</label>
+      <div class="flex gap-2">
+        <!-- 預設為洗前狀態 -->
+        <button id="btnBefore" onclick="setStatus('洗前')" class="flex-1 py-3 rounded-lg text-white font-medium transition-all bg-[#a67c76] shadow-md">
+          洗前
+        </button>
+        <button id="btnAfter" onclick="setStatus('洗後')" class="flex-1 py-3 rounded-lg text-[#4a5553] font-medium transition-all bg-[#e2e5e4]">
+          洗後
+        </button>
+      </div>
+    </div>
   </div>
 
+  <!-- 相機預覽區塊 -->
+  <div class="relative w-full aspect-[3/4] bg-black rounded-xl overflow-hidden shadow-sm flex-shrink-0">
+    <!-- 提示訊息 -->
+    <div id="cameraStatus" class="absolute inset-0 flex items-center justify-center text-white text-sm z-10">
+      載入相機中...
+    </div>
+    <video id="cameraFeed" class="absolute inset-0 w-full h-full object-cover z-20" autoplay playsinline></video>
+    
+    <!-- 快門按鈕 -->
+    <button id="captureBtn" onclick="takePhoto()" 
+            class="absolute bottom-24 left-1/2 -translate-x-1/2 w-16 h-16 bg-white/90 backdrop-blur-sm rounded-full border-4 border-white flex items-center justify-center z-30 shadow-xl active:scale-95 transition-all">
+      <i data-lucide="camera" class="w-7 h-7 text-[#4a5553]"></i>
+    </button>
+  </div>
+
+  <!-- 拍攝歷史紀錄 -->
+  <div class="flex-1 bg-white p-4 rounded-xl shadow-sm overflow-y-auto">
+    <div class="flex items-center gap-2 mb-3 text-sm font-medium text-[#8b9693]">
+      <i data-lucide="image" class="w-4 h-4"></i>
+      <span>本次拍攝紀錄 (已自動下載至手機)</span>
+    </div>
+    <div id="gallery" class="grid grid-cols-3 gap-2">
+      <!-- 縮圖會產生在這裡 -->
+    </div>
+  </div>
+
+  <!-- 隱藏的 Canvas 用於合成影像 -->
+  <canvas id="canvas" class="hidden"></canvas>
+
   <script>
+    // 初始化圖示
     lucide.createIcons();
 
-    function getInitRocTimeString() {
+    let currentStatus = '洗前';
+    const video = document.getElementById('cameraFeed');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const cameraStatus = document.getElementById('cameraStatus');
+
+    // 頁面重整時，確保清空所有輸入框與選擇
+    window.addEventListener('load', () => {
+      document.getElementById('addressInput').value = '';
+      document.getElementById('positionInput').value = '';
+      const checkedFloor = document.querySelector('input[name="floor"]:checked');
+      if(checkedFloor) checkedFloor.checked = false;
+      
+      startCamera(); // 啟動相機
+    });
+
+    // 設定狀態按鈕樣式切換 (顏色連動)
+    function setStatus(status) {
+      currentStatus = status;
+      const btnBefore = document.getElementById('btnBefore');
+      const btnAfter = document.getElementById('btnAfter');
+      
+      if (status === '洗前') {
+        btnBefore.className = 'flex-1 py-3 rounded-lg text-white font-medium transition-all bg-[#a67c76] shadow-md';
+        btnAfter.className = 'flex-1 py-3 rounded-lg text-[#4a5553] font-medium transition-all bg-[#e2e5e4]';
+      } else {
+        btnBefore.className = 'flex-1 py-3 rounded-lg text-[#4a5553] font-medium transition-all bg-[#e2e5e4]';
+        btnAfter.className = 'flex-1 py-3 rounded-lg text-white font-medium transition-all bg-[#6b8e85] shadow-md';
+      }
+    }
+
+    // 啟動手機後置鏡頭
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          },
+          audio: false
+        });
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+          cameraStatus.style.display = 'none';
+        };
+      } catch (err) {
+        console.error("相機存取失敗:", err);
+        cameraStatus.textContent = "無法存取相機，請確認瀏覽器權限。";
+      }
+    }
+
+    // 取得民國年時間字串
+    function getROCTimeString() {
       const now = new Date();
       const rocYear = now.getFullYear() - 1911;
       const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -159,136 +183,110 @@
       return `民國${rocYear}年${month}月${date}日 ${hours}:${minutes}`;
     }
 
-    // 頁面載入時清空自定義輸入框，確保「重整就消失」，並設定初始時間
-    window.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('addressInput').value = '';
-      document.getElementById('positionInput').value = '';
-      const checkedFloor = document.querySelector('input[name="floor"]:checked');
-      if(checkedFloor) checkedFloor.checked = false;
-      document.getElementById('timeInput').value = getInitRocTimeString();
-    });
+    // 拍照並合成浮水印
+    function takePhoto() {
+      // 確保相機已經有畫面
+      if (!video.videoWidth) return;
 
-    const cameraInput = document.getElementById('cameraInput');
-    const photoCanvas = document.getElementById('photoCanvas');
-    const ctx = photoCanvas.getContext('2d');
-    const photoGallery = document.getElementById('photoGallery');
-    const actionArea = document.getElementById('actionArea');
-    const saveAllBtn = document.getElementById('saveAllBtn');
-    const photoCountDisplay = document.getElementById('photoCount');
-    const saveStatus = document.getElementById('saveStatus');
-    
-    let capturedPhotos = [];
-
-    cameraInput.addEventListener('change', function(e) {
-      const file = e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = function(event) {
-        const img = new Image();
-        img.onload = function() {
-          processAndStoreImage(img);
-        }
-        img.src = event.target.result;
-      }
-      reader.readAsDataURL(file);
-      e.target.value = '';
-    });
-
-    function processAndStoreImage(img) {
-      photoCanvas.width = img.width;
-      photoCanvas.height = img.height;
-      ctx.drawImage(img, 0, 0);
-
-      // 取得各欄位值並組合
+      // 取得三個地點欄位的值
       const address = document.getElementById('addressInput').value.trim();
       const floorInput = document.querySelector('input[name="floor"]:checked');
       const floor = floorInput ? floorInput.value : '';
       const position = document.getElementById('positionInput').value.trim();
       
-      // 過濾空值後以空格連接
-      const locationInfo = [address, floor, position].filter(Boolean).join(' ') || '未填寫地點';
-      
-      const timeInfo = document.getElementById('timeInput').value || '未填寫時間';
-      const statusInfo = document.querySelector('input[name="status"]:checked').value;
+      // 組合地點字串，過濾掉未填寫的空白
+      const location = [address, floor, position].filter(Boolean).join(' ') || '未指定地點';
+      const timeStr = getROCTimeString();
 
-      const fontSize = Math.max(photoCanvas.height * 0.03, 24);
-      ctx.font = `bold ${fontSize}px "Noto Sans TC", sans-serif`;
-      
-      const padding = fontSize * 0.5;
-      const textX = padding * 2;
-      
-      // 將文字整體Y軸位置往下移動 2px
-      const textY = photoCanvas.height - (fontSize * 4) - padding * 2 + 2;
-      
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-      // 背景框同步下移 2px
-      ctx.fillRect(0, textY - padding, photoCanvas.width, (fontSize * 4.5) + padding * 2);
+      // 設定 Canvas 尺寸與相機解析度一致，確保畫質
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
 
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillText(`階段：${statusInfo}`, textX, textY + fontSize);
-      ctx.fillText(`地點：${locationInfo}`, textX, textY + (fontSize * 2.5));
-      ctx.fillText(`時間：${timeInfo}`, textX, textY + (fontSize * 4));
+      // 1. 畫上相機當下畫面
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      const finalDataUrl = photoCanvas.toDataURL('image/jpeg', 0.9);
-      capturedPhotos.push({
-        dataUrl: finalDataUrl,
-        timestamp: Date.now()
+      // 2. 設定浮水印樣式
+      const fontSize = Math.max(Math.floor(canvas.width * 0.035), 24);
+      const padding = fontSize;
+      const lineHeight = fontSize * 1.4;
+      
+      const textLines = [
+        `狀態：${currentStatus}`,
+        `地點：${location}`,
+        `時間：${timeStr}`
+      ];
+
+      // 計算背景框的大小
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      let maxWidth = 0;
+      textLines.forEach(line => {
+        const width = ctx.measureText(line).width;
+        if (width > maxWidth) maxWidth = width;
       });
 
-      renderGallery();
-    }
+      const boxWidth = maxWidth + (padding * 2);
+      const boxHeight = (textLines.length * lineHeight) + padding;
+      const startX = padding;
+      const startY = canvas.height - boxHeight - padding;
 
-    function renderGallery() {
-      if (capturedPhotos.length > 0) {
-        photoGallery.classList.remove('hidden');
-        actionArea.classList.remove('hidden');
-        actionArea.classList.add('flex');
-        photoCountDisplay.textContent = capturedPhotos.length;
-        
-        photoGallery.innerHTML = '';
-        capturedPhotos.forEach((photo) => {
-          const imgEl = document.createElement('img');
-          imgEl.src = photo.dataUrl;
-          imgEl.className = 'w-full h-24 object-cover rounded-lg shadow-sm border border-gray-200';
-          photoGallery.appendChild(imgEl);
-        });
+      // 3. 畫上半透明背景底色 (根據洗前洗後套用專屬辨識色)
+      if (currentStatus === '洗前') {
+        ctx.fillStyle = 'rgba(166, 124, 118, 0.85)'; // 莫蘭迪粉褐
+      } else {
+        ctx.fillStyle = 'rgba(107, 142, 133, 0.85)'; // 莫蘭迪藍綠
       }
+      
+      ctx.beginPath();
+      ctx.roundRect(startX, startY, boxWidth, boxHeight, 12);
+      ctx.fill();
+
+      // 4. 畫上文字 (Y 軸再增加 2px，總計 +4 微調位置)
+      ctx.fillStyle = '#ffffff';
+      ctx.textBaseline = 'top';
+      textLines.forEach((line, index) => {
+        ctx.fillText(line, startX + padding, startY + (padding/2) + (index * lineHeight) + 4);
+      });
+
+      // 5. 產生絕對唯一的檔名標籤 (加入毫秒)
+      const photoDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      const baseTime = timeStr.replace(/[\s:]/g, '');
+      const uniqueMs = String(new Date().getMilliseconds()).padStart(3, '0');
+      const uniqueFileName = `${baseTime}_${uniqueMs}`;
+
+      downloadAndDisplay(photoDataUrl, currentStatus, uniqueFileName);
     }
 
-    saveAllBtn.addEventListener('click', () => {
-      if (capturedPhotos.length === 0) return;
+    // 處理下載與產生縮圖
+    function downloadAndDisplay(dataUrl, status, uniqueFileName) {
+      // 觸發自動下載
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `工程紀錄_${status}_${uniqueFileName}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
-      const originalText = saveAllBtn.innerHTML;
-      saveAllBtn.innerHTML = '<i data-lucide="loader" class="w-5 h-5 animate-spin"></i><span>處理中...</span>';
-      lucide.createIcons();
+      // 在畫面下方新增縮圖供檢視
+      const gallery = document.getElementById('gallery');
+      const imgWrapper = document.createElement('div');
+      imgWrapper.className = 'aspect-square rounded-md overflow-hidden border border-[#e2e5e4] shadow-sm relative';
+      
+      const img = document.createElement('img');
+      img.src = dataUrl;
+      img.className = 'w-full h-full object-cover';
+      
+      // 縮圖標籤同樣套用專屬辨識色
+      const badgeColor = status === '洗前' ? 'bg-[#a67c76]' : 'bg-[#6b8e85]';
+      const badge = document.createElement('div');
+      badge.className = `absolute bottom-0 left-0 right-0 ${badgeColor} text-white text-[12px] py-1 text-center font-medium`;
+      badge.textContent = status;
 
-      capturedPhotos.forEach((photo, index) => {
-        setTimeout(() => {
-          const link = document.createElement('a');
-          link.download = `現場紀錄_${index + 1}_${photo.timestamp}.jpg`;
-          link.href = photo.dataUrl;
-          link.click();
-
-          if (index === capturedPhotos.length - 1) {
-            saveAllBtn.innerHTML = originalText;
-            lucide.createIcons();
-            saveStatus.classList.remove('opacity-0');
-            saveStatus.classList.add('opacity-100');
-            
-            setTimeout(() => {
-              saveStatus.classList.remove('opacity-100');
-              saveStatus.classList.add('opacity-0');
-              capturedPhotos = [];
-              photoGallery.innerHTML = '';
-              photoGallery.classList.add('hidden');
-              actionArea.classList.add('hidden');
-              actionArea.classList.remove('flex');
-            }, 3000);
-          }
-        }, index * 400); 
-      });
-    });
+      imgWrapper.appendChild(img);
+      imgWrapper.appendChild(badge);
+      
+      // 將最新拍的照片插在最前面
+      gallery.insertBefore(imgWrapper, gallery.firstChild);
+    }
   </script>
 </body>
 </html>
