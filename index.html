@@ -72,7 +72,7 @@
   <div class="flex-1 bg-white p-4 rounded-xl shadow-sm overflow-y-auto">
     <div class="flex items-center gap-2 mb-3 text-sm font-medium text-[#8b9693]">
       <i data-lucide="image" class="w-4 h-4"></i>
-      <span>本次拍攝紀錄 (將自動下載至手機)</span>
+      <span>本次拍攝紀錄 (已自動下載至手機)</span>
     </div>
     <div id="gallery" class="grid grid-cols-3 gap-2">
       <!-- 縮圖會產生在這裡 -->
@@ -192,17 +192,21 @@
         ctx.fillText(line, startX + padding, startY + (padding/2) + (index * lineHeight));
       });
 
-      // 5. 輸出照片並下載
+      // 5. 產生絕對唯一的檔名標籤 (加入毫秒數，避免覆蓋與瀏覽器彈窗)
       const photoDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-      downloadAndDisplay(photoDataUrl, currentStatus, timeStr.replace(/[\s:]/g, ''));
+      const baseTime = timeStr.replace(/[\s:]/g, '');
+      const uniqueMs = String(new Date().getMilliseconds()).padStart(3, '0');
+      const uniqueFileName = `${baseTime}_${uniqueMs}`;
+
+      downloadAndDisplay(photoDataUrl, currentStatus, uniqueFileName);
     }
 
     // 處理下載與產生縮圖
-    function downloadAndDisplay(dataUrl, status, timeKey) {
+    function downloadAndDisplay(dataUrl, status, uniqueFileName) {
       // 觸發自動下載
       const link = document.createElement('a');
       link.href = dataUrl;
-      link.download = `工程紀錄_${status}_${timeKey}.jpg`;
+      link.download = `工程紀錄_${status}_${uniqueFileName}.jpg`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
