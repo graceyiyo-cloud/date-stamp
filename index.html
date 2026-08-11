@@ -24,6 +24,28 @@
     }
     /* 隱藏預設捲軸讓畫面更乾淨 */
     ::-webkit-scrollbar { width: 0px; background: transparent; }
+    
+    /* 自訂縮放滑桿樣式 */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: transparent;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+      margin-top: -6px;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 4px;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.5);
+      border-radius: 2px;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col max-w-md mx-auto p-4 gap-4 pb-24">
@@ -95,9 +117,21 @@
     </div>
     <video id="cameraFeed" class="absolute inset-0 w-full h-full object-cover z-20" autoplay playsinline></video>
     
+    <!-- 閃光燈開關 (預設隱藏，硬體支援時顯示) -->
+    <button id="flashBtn" onclick="toggleFlash()" class="hidden absolute top-4 right-4 w-10 h-10 bg-black/40 backdrop-blur-sm rounded-full items-center justify-center z-30 text-white border border-white/30 transition-colors">
+      <i data-lucide="zap" class="w-5 h-5"></i>
+    </button>
+
+    <!-- 縮放控制 (預設隱藏，硬體支援時顯示) -->
+    <div id="zoomContainer" class="hidden absolute bottom-44 left-1/2 -translate-x-1/2 w-3/4 bg-black/40 backdrop-blur-sm px-4 py-3 rounded-full items-center gap-3 z-30 border border-white/30">
+      <i data-lucide="zoom-out" class="w-4 h-4 text-white flex-shrink-0"></i>
+      <input type="range" id="zoomSlider" oninput="handleZoom(event)" class="w-full">
+      <i data-lucide="zoom-in" class="w-4 h-4 text-white flex-shrink-0"></i>
+    </div>
+
     <!-- 快門按鈕 -->
     <button id="captureBtn" onclick="takePhoto()" 
-            class="absolute bottom-24 left-1/2 -translate-x-1/2 w-16 h-16 bg-white/90 backdrop-blur-sm rounded-full border-4 border-white flex items-center justify-center z-30 shadow-xl active:scale-95 transition-all">
+            class="absolute bottom-20 left-1/2 -translate-x-1/2 w-16 h-16 bg-white/90 backdrop-blur-sm rounded-full border-4 border-white flex items-center justify-center z-30 shadow-xl active:scale-95 transition-all">
       <i data-lucide="camera" class="w-7 h-7 text-[#4a5553]"></i>
     </button>
   </div>
@@ -121,6 +155,9 @@
     lucide.createIcons();
 
     let currentStatus = '洗前';
+    let videoTrack = null;
+    let isFlashOn = false;
+    
     const video = document.getElementById('cameraFeed');
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
@@ -163,12 +200,87 @@
           audio: false
         });
         video.srcObject = stream;
+        videoTrack = stream.getVideoTracks()[0];
+        
         video.onloadedmetadata = () => {
           cameraStatus.style.display = 'none';
+          checkCameraCapabilities(); // 檢查並啟用閃光燈/縮放功能
         };
       } catch (err) {
         console.error("相機存取失敗:", err);
         cameraStatus.textContent = "無法存取相機，請確認瀏覽器權限。";
+      }
+    }
+
+    // 偵測硬體是否支援閃光燈與縮放
+    function checkCameraCapabilities() {
+      if (!videoTrack) return;
+      
+      // 確保在部分瀏覽器中需要延遲才能正確取得 capabilities
+      setTimeout(() => {
+        try {
+          const capabilities = videoTrack.getCapabilities();
+          
+          // 閃光燈支援判斷
+          const flashBtn = document.getElementById('flashBtn');
+          if (capabilities.torch) {
+            flashBtn.classList.remove('hidden');
+            flashBtn.classList.add('flex');
+          }
+
+          // 縮放支援判斷
+          const zoomContainer = document.getElementById('zoomContainer');
+          const zoomSlider = document.getElementById('zoomSlider');
+          if (capabilities.zoom) {
+            zoomContainer.classList.remove('hidden');
+            zoomContainer.classList.add('flex');
+            
+            // 設定滑桿範圍
+            zoomSlider.min = capabilities.zoom.min;
+            zoomSlider.max = capabilities.zoom.max;
+            zoomSlider.step = capabilities.zoom.step;
+            zoomSlider.value = capabilities.zoom.min; // 預設最小倍率
+          }
+        } catch (e) {
+          console.warn("無法取得相機進階功能", e);
+        }
+      }, 500);
+    }
+
+    // 切換閃光燈
+    async function toggleFlash() {
+      if (!videoTrack) return;
+      isFlashOn = !isFlashOn;
+      
+      try {
+        await videoTrack.applyConstraints({
+          advanced: [{ torch: isFlashOn }]
+        });
+        
+        // 更新按鈕外觀與圖示
+        const flashBtn = document.getElementById('flashBtn');
+        if (isFlashOn) {
+          flashBtn.className = 'absolute top-4 right-4 w-10 h-10 bg-white rounded-full flex items-center justify-center z-30 text-[#4a5553] shadow-md transition-colors';
+          flashBtn.innerHTML = '<i data-lucide="zap-off" class="w-5 h-5"></i>';
+        } else {
+          flashBtn.className = 'absolute top-4 right-4 w-10 h-10 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center z-30 text-white border border-white/30 transition-colors';
+          flashBtn.innerHTML = '<i data-lucide="zap" class="w-5 h-5"></i>';
+        }
+        lucide.createIcons();
+      } catch (err) {
+        console.error('閃光燈切換失敗:', err);
+      }
+    }
+
+    // 處理縮放
+    async function handleZoom(e) {
+      if (!videoTrack) return;
+      try {
+        await videoTrack.applyConstraints({
+          advanced: [{ zoom: parseFloat(e.target.value) }]
+        });
+      } catch (err) {
+        console.error('縮放失敗:', err);
       }
     }
 
@@ -185,27 +297,20 @@
 
     // 拍照並合成浮水印
     function takePhoto() {
-      // 確保相機已經有畫面
       if (!video.videoWidth) return;
 
-      // 取得三個地點欄位的值
       const address = document.getElementById('addressInput').value.trim();
       const floorInput = document.querySelector('input[name="floor"]:checked');
       const floor = floorInput ? floorInput.value : '';
       const position = document.getElementById('positionInput').value.trim();
       
-      // 組合地點字串，過濾掉未填寫的空白
       const location = [address, floor, position].filter(Boolean).join(' ') || '未指定地點';
       const timeStr = getROCTimeString();
 
-      // 設定 Canvas 尺寸與相機解析度一致，確保畫質
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-
-      // 1. 畫上相機當下畫面
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // 2. 設定浮水印樣式
       const fontSize = Math.max(Math.floor(canvas.width * 0.035), 24);
       const padding = fontSize;
       const lineHeight = fontSize * 1.4;
@@ -216,7 +321,6 @@
         `時間：${timeStr}`
       ];
 
-      // 計算背景框的大小
       ctx.font = `bold ${fontSize}px sans-serif`;
       let maxWidth = 0;
       textLines.forEach(line => {
@@ -229,25 +333,22 @@
       const startX = padding;
       const startY = canvas.height - boxHeight - padding;
 
-      // 3. 畫上半透明背景底色 (根據洗前洗後套用專屬辨識色)
       if (currentStatus === '洗前') {
-        ctx.fillStyle = 'rgba(166, 124, 118, 0.85)'; // 莫蘭迪粉褐
+        ctx.fillStyle = 'rgba(166, 124, 118, 0.85)';
       } else {
-        ctx.fillStyle = 'rgba(107, 142, 133, 0.85)'; // 莫蘭迪藍綠
+        ctx.fillStyle = 'rgba(107, 142, 133, 0.85)';
       }
       
       ctx.beginPath();
       ctx.roundRect(startX, startY, boxWidth, boxHeight, 12);
       ctx.fill();
 
-      // 4. 畫上文字 (Y 軸再增加 2px，總計 +4 微調位置)
       ctx.fillStyle = '#ffffff';
       ctx.textBaseline = 'top';
       textLines.forEach((line, index) => {
         ctx.fillText(line, startX + padding, startY + (padding/2) + (index * lineHeight) + 4);
       });
 
-      // 5. 產生絕對唯一的檔名標籤 (加入毫秒)
       const photoDataUrl = canvas.toDataURL('image/jpeg', 0.9);
       const baseTime = timeStr.replace(/[\s:]/g, '');
       const uniqueMs = String(new Date().getMilliseconds()).padStart(3, '0');
@@ -258,7 +359,6 @@
 
     // 處理下載與產生縮圖
     function downloadAndDisplay(dataUrl, status, uniqueFileName) {
-      // 觸發自動下載
       const link = document.createElement('a');
       link.href = dataUrl;
       link.download = `工程紀錄_${status}_${uniqueFileName}.jpg`;
@@ -266,7 +366,6 @@
       link.click();
       document.body.removeChild(link);
 
-      // 在畫面下方新增縮圖供檢視
       const gallery = document.getElementById('gallery');
       const imgWrapper = document.createElement('div');
       imgWrapper.className = 'aspect-square rounded-md overflow-hidden border border-[#e2e5e4] shadow-sm relative';
@@ -275,7 +374,6 @@
       img.src = dataUrl;
       img.className = 'w-full h-full object-cover';
       
-      // 縮圖標籤同樣套用專屬辨識色
       const badgeColor = status === '洗前' ? 'bg-[#a67c76]' : 'bg-[#6b8e85]';
       const badge = document.createElement('div');
       badge.className = `absolute bottom-0 left-0 right-0 ${badgeColor} text-white text-[12px] py-1 text-center font-medium`;
@@ -284,7 +382,6 @@
       imgWrapper.appendChild(img);
       imgWrapper.appendChild(badge);
       
-      // 將最新拍的照片插在最前面
       gallery.insertBefore(imgWrapper, gallery.firstChild);
     }
   </script>
