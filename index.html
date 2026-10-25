@@ -402,7 +402,7 @@
       const uniqueMs = String(new Date().getMilliseconds()).padStart(3, '0');
       const uniqueFileName = `${baseTime}_${uniqueMs}`;
 
-      downloadAndDisplay(photoDataUrl, currentStatus, uniqueFileName);
+      downloadAndDisplay(photoDataUrl, currentStatus, uniqueFileName, address);
     }
 
     function takePhoto() {
@@ -432,10 +432,11 @@
       event.target.value = '';
     }
 
-    function downloadAndDisplay(dataUrl, status, uniqueFileName) {
+    function downloadAndDisplay(dataUrl, status, uniqueFileName, storeName) {
       const link = document.createElement('a');
       link.href = dataUrl;
-      link.download = `工程紀錄_${status}_${uniqueFileName}.jpg`;
+      const safeStoreName = (storeName || '未指定店名').replace(/[<>:"\/\\|?*\u0000-\u001f]/g, '_');
+      link.download = `工程紀錄_${safeStoreName}_${status}_${uniqueFileName}.jpg`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
