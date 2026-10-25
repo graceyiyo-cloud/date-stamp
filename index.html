@@ -114,7 +114,7 @@
       <span>開啟工程相簿助手</span>
     </a>
     <p class="text-xs text-[#71807a] leading-relaxed">照片下載完成後開啟助手，選日期、照片及 LINE 群組，建立「日期＋工程地點」相簿。</p>
-    <a href="https://github.com/graceyiyo-cloud/date-stamp/releases/download/album-assistant-v0.1.0/engineering-album-assistant-0.1.0.apk" class="text-sm underline underline-offset-4 text-[#64796e]">首次使用：下載 Android 助手 APK</a>
+    <a href="https://github.com/graceyiyo-cloud/date-stamp/releases/download/album-assistant-v0.1.1/engineering-album-assistant-0.1.1.apk" class="text-sm underline underline-offset-4 text-[#64796e]">首次使用：下載 Android 助手 APK</a>
     <p id="albumAssistantHint" class="text-xs text-[#71807a] hidden" role="status"></p>
   </section>
 
@@ -471,7 +471,7 @@
     const now = new Date();
     const date = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
     const params = new URLSearchParams({date, location: document.getElementById('addressInput').value.trim()});
-    const fallback = 'https://github.com/graceyiyo-cloud/date-stamp/releases/download/album-assistant-v0.1.0/engineering-album-assistant-0.1.0.apk';
+    const fallback = 'https://github.com/graceyiyo-cloud/date-stamp/releases/download/album-assistant-v0.1.1/engineering-album-assistant-0.1.1.apk';
     hint.textContent = '若未開啟，請先安裝助手；LINE 內建瀏覽器可改用 Chrome 開啟本頁。';
     hint.classList.remove('hidden');
     window.location.href = 'intent://upload?' + params.toString() + '#Intent;scheme=engineeringalbum;package=tw.personal.engineeringalbum;S.browser_fallback_url=' + encodeURIComponent(fallback) + ';end';
