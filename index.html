@@ -100,7 +100,7 @@
       width: 100%;
       height: 4px;
       cursor: pointer;
-      background: #dfe3e1;
+      background: #d5dad8;
       border-radius: 2px;
     }
     input[type=range]::-moz-range-thumb {
@@ -113,21 +113,20 @@
     }
     input[type=range]::-moz-range-track {
       height: 4px;
-      background: #dfe3e1;
+      background: #d5dad8;
       border-radius: 2px;
     }
 
-    /* 取景框：比例跟隨實際相機畫面（所見即所拍），高度保留空間讓下方按鈕同畫面可見 */
+    /* 取景框：固定 3:4 滿寬；螢幕太矮時才縮小，讓下方按鈕留在同一畫面 */
     #previewFrame {
-      --ratio: 0.75;
-      --frame-max-h: calc(100vh - 196px);
-      aspect-ratio: var(--ratio);
-      width: min(100%, calc(max(var(--frame-max-h), 240px) * var(--ratio)));
+      --frame-max-h: calc(100vh - 170px);
+      aspect-ratio: 3 / 4;
+      width: min(100%, calc(max(var(--frame-max-h), 320px) * 0.75));
       margin-inline: auto;
       touch-action: pan-y;
     }
     @supports (height: 100svh) {
-      #previewFrame { --frame-max-h: calc(100svh - 196px); }
+      #previewFrame { --frame-max-h: calc(100svh - 170px); }
     }
 
     /* 取景框下方的操作按鈕 */
@@ -146,18 +145,20 @@
       justify-content: center;
       flex-shrink: 0;
       border-radius: 9999px;
-      background: #f0f2f0;
+      background: #ffffff;
+      border: 1px solid #e2e5e4;
       color: #5f6d69;
       transition: transform .12s ease, background-color .15s ease, color .15s ease;
     }
     .ctrl-btn:active .ctrl-round, button.ctrl-round:active { transform: scale(0.92); }
     .ctrl-label { font-size: 11px; line-height: 1; font-weight: 500; }
-    #flashBtn[aria-pressed="true"] .ctrl-round { background: #7a8b85; color: #ffffff; }
+    #flashBtn[aria-pressed="true"] .ctrl-round { background: #7a8b85; border-color: #7a8b85; color: #ffffff; }
     .shutter {
       width: 72px;
       height: 72px;
       border-radius: 9999px;
-      border: 4px solid #dfe3e1;
+      border: 4px solid #ffffff;
+      box-shadow: 0 0 0 1px #d5dad8, 0 2px 6px rgba(74, 85, 83, 0.12);
       background: #ffffff;
       display: flex;
       align-items: center;
@@ -247,9 +248,9 @@
   </div>
 
   <!-- 相機區塊：取景框在上，操作按鈕在下，不遮擋畫面 -->
-  <section aria-label="相機" class="bg-white p-3 rounded-xl shadow-sm flex flex-col gap-3 flex-shrink-0">
-    <div id="previewFrame" class="relative bg-black rounded-lg overflow-hidden">
-      <video id="cameraFeed" class="absolute inset-0 w-full h-full object-contain" autoplay playsinline muted></video>
+  <section aria-label="相機" class="flex flex-col gap-3 flex-shrink-0">
+    <div id="previewFrame" class="relative bg-black rounded-xl overflow-hidden shadow-sm">
+      <video id="cameraFeed" class="absolute inset-0 w-full h-full object-cover" autoplay playsinline></video>
       <!-- 浮水印內容預覽（狀態＋地點） -->
       <div id="stampPreview" aria-hidden="true" class="pointer-events-none absolute left-2 bottom-2 z-10 max-w-[calc(100%-1rem)] truncate rounded-md px-2 py-1 text-xs font-medium text-white"></div>
       <div id="shotFlash" class="pointer-events-none absolute inset-0 z-10 bg-white opacity-0"></div>
@@ -438,8 +439,6 @@
         videoTrack.addEventListener('ended', handleTrackEnded);
         autoResume = true;
         video.srcObject = stream;
-        const playing = video.play();
-        if (playing && playing.catch) playing.catch(() => {});
       } catch (err) {
         console.error("相機存取失敗:", err);
         if (cameraWanted) showCameraMessage('無法存取相機，請確認瀏覽器權限。點一下重試', true);
@@ -480,23 +479,36 @@
       startCamera();
     });
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) resumeCamera();
+      if (document.hidden) return;
+      resumeCamera();
+      ensurePreviewPlaying();
     });
     window.addEventListener('focus', resumeCamera);
 
     video.addEventListener('loadedmetadata', () => {
       if (!isCameraLive()) return;
-      updatePreviewRatio();
       hideCameraMessage();
       captureBtn.disabled = false;
       checkCameraCapabilities();
     });
-    video.addEventListener('resize', updatePreviewRatio);
 
-    function updatePreviewRatio() {
-      if (video.videoWidth && video.videoHeight) {
-        previewFrame.style.setProperty('--ratio', (video.videoWidth / video.videoHeight).toFixed(4));
-      }
+    // 預覽若被瀏覽器暫停（捲出畫面、切換 App 等），回到可見時自動續播；點一下取景框也會續播
+    let replayTimer = null;
+    function ensurePreviewPlaying() {
+      clearTimeout(replayTimer);
+      replayTimer = setTimeout(() => {
+        if (isCameraLive() && !document.hidden && video.paused) {
+          const playing = video.play();
+          if (playing && playing.catch) playing.catch(() => {});
+        }
+      }, 300);
+    }
+    video.addEventListener('pause', ensurePreviewPlaying);
+    previewFrame.addEventListener('click', ensurePreviewPlaying);
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver((entries) => {
+        if (entries.some(entry => entry.isIntersecting)) ensurePreviewPlaying();
+      }).observe(previewFrame);
     }
 
     function resetCameraControls() {
