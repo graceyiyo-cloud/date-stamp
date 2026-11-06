@@ -78,26 +78,104 @@
     /* 隱藏預設捲軸讓畫面更乾淨 */
     ::-webkit-scrollbar { width: 0px; background: transparent; }
     
-    /* 自訂縮放滑桿樣式 */
+    /* 自訂縮放滑桿樣式（位於取景框下方的淺色底） */
     input[type=range] {
       -webkit-appearance: none;
+      appearance: none;
       background: transparent;
+      height: 32px;
     }
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none;
-      height: 16px;
-      width: 16px;
+      height: 22px;
+      width: 22px;
       border-radius: 50%;
-      background: #ffffff;
+      background: #7a8b85;
+      border: 3px solid #ffffff;
+      box-shadow: 0 1px 3px rgba(74, 85, 83, 0.3);
       cursor: pointer;
-      margin-top: -6px;
+      margin-top: -9px;
     }
     input[type=range]::-webkit-slider-runnable-track {
       width: 100%;
       height: 4px;
       cursor: pointer;
-      background: rgba(255, 255, 255, 0.5);
+      background: #dfe3e1;
       border-radius: 2px;
+    }
+    input[type=range]::-moz-range-thumb {
+      height: 16px;
+      width: 16px;
+      border-radius: 50%;
+      background: #7a8b85;
+      border: 3px solid #ffffff;
+      cursor: pointer;
+    }
+    input[type=range]::-moz-range-track {
+      height: 4px;
+      background: #dfe3e1;
+      border-radius: 2px;
+    }
+
+    /* 取景框：比例跟隨實際相機畫面（所見即所拍），高度保留空間讓下方按鈕同畫面可見 */
+    #previewFrame {
+      --ratio: 0.75;
+      --frame-max-h: calc(100vh - 196px);
+      aspect-ratio: var(--ratio);
+      width: min(100%, calc(max(var(--frame-max-h), 240px) * var(--ratio)));
+      margin-inline: auto;
+      touch-action: pan-y;
+    }
+    @supports (height: 100svh) {
+      #previewFrame { --frame-max-h: calc(100svh - 196px); }
+    }
+
+    /* 取景框下方的操作按鈕 */
+    .ctrl-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      color: #6b7773;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    .ctrl-round {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      border-radius: 9999px;
+      background: #f0f2f0;
+      color: #5f6d69;
+      transition: transform .12s ease, background-color .15s ease, color .15s ease;
+    }
+    .ctrl-btn:active .ctrl-round, button.ctrl-round:active { transform: scale(0.92); }
+    .ctrl-label { font-size: 11px; line-height: 1; font-weight: 500; }
+    #flashBtn[aria-pressed="true"] .ctrl-round { background: #7a8b85; color: #ffffff; }
+    .shutter {
+      width: 72px;
+      height: 72px;
+      border-radius: 9999px;
+      border: 4px solid #dfe3e1;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform .12s ease, opacity .2s ease;
+    }
+    .shutter:active:not(:disabled) { transform: scale(0.92); }
+    .shutter:disabled { opacity: .4; cursor: default; }
+    .shutter-core {
+      width: 54px;
+      height: 54px;
+      border-radius: 9999px;
+      background: var(--color-before);
+      transition: background-color .2s ease;
+    }
+    .ctrl-btn:focus-visible .ctrl-round, button.ctrl-round:focus-visible, .shutter:focus-visible {
+      outline: 2px solid #8b9693;
+      outline-offset: 2px;
     }
   </style>
 </head>
@@ -108,17 +186,6 @@
     <i data-lucide="camera" class="w-6 h-6 text-[#7a8b85]"></i>
     <h1 class="text-xl font-bold text-[#4a5553]">工程紀錄拍攝工具</h1>
   </header>
-
-  <section aria-label="工程相簿助手" class="bg-white p-4 rounded-xl shadow-sm flex flex-col gap-3">
-    <a id="openAlbumAssistant" href="engineeringalbum://upload" class="flex items-center justify-center gap-2 rounded-lg py-3 bg-[#7a8b85] text-white font-medium" aria-label="開啟工程相簿助手 App">
-      <i data-lucide="images" class="w-5 h-5" aria-hidden="true"></i>
-      <span>開啟工程相簿助手</span>
-    </a>
-    <p class="text-xs text-[#71807a] leading-relaxed">照片下載完成後開啟助手，依日期與店名分別建立 LINE 群組相簿。</p>
-    <a href="https://github.com/graceyiyo-cloud/date-stamp/releases/download/album-assistant-v0.1.16/engineering-album-assistant-0.1.16.apk" class="text-sm underline underline-offset-4 text-[#64796e]">下載／更新 Android 助手 APK（v0.1.16）</a>
-    <p class="text-xs text-[#71807a]">v0.1.15 起更換簽章：若已安裝 v0.1.10 以前的版本，請先移除舊版再安裝。</p>
-    <p id="albumAssistantHint" class="text-xs text-[#71807a] hidden" role="status"></p>
-  </section>
 
   <!-- 設定區塊 -->
   <div class="bg-white p-4 rounded-xl shadow-sm flex flex-col gap-4">
@@ -179,72 +246,139 @@
     </div>
   </div>
 
-  <!-- 相機預覽區塊 -->
-  <div class="relative w-full aspect-[3/4] bg-black rounded-xl overflow-hidden shadow-sm flex-shrink-0">
-    <div id="cameraStatus" class="absolute inset-0 flex items-center justify-center text-white text-sm z-10">
-      載入相機中...
+  <!-- 相機區塊：取景框在上，操作按鈕在下，不遮擋畫面 -->
+  <section aria-label="相機" class="bg-white p-3 rounded-xl shadow-sm flex flex-col gap-3 flex-shrink-0">
+    <div id="previewFrame" class="relative bg-black rounded-lg overflow-hidden">
+      <video id="cameraFeed" class="absolute inset-0 w-full h-full object-contain" autoplay playsinline muted></video>
+      <!-- 浮水印內容預覽（狀態＋地點） -->
+      <div id="stampPreview" aria-hidden="true" class="pointer-events-none absolute left-2 bottom-2 z-10 max-w-[calc(100%-1rem)] truncate rounded-md px-2 py-1 text-xs font-medium text-white"></div>
+      <div id="shotFlash" class="pointer-events-none absolute inset-0 z-10 bg-white opacity-0"></div>
+      <button id="cameraStatus" type="button" disabled class="absolute inset-0 z-20 flex items-center justify-center px-6 text-center text-white text-sm leading-relaxed bg-black">
+        載入相機中...
+      </button>
     </div>
-    <video id="cameraFeed" class="absolute inset-0 w-full h-full object-cover z-20" autoplay playsinline></video>
-    
-    <!-- 網頁原生閃光燈開關 -->
-    <button id="flashBtn" onclick="toggleFlash()" class="hidden absolute top-4 right-4 w-10 h-10 bg-black/40 backdrop-blur-sm rounded-full items-center justify-center z-30 text-white border border-white/30 transition-colors">
-      <i data-lucide="zap" class="w-5 h-5"></i>
-    </button>
 
     <!-- 縮放控制 -->
-    <div id="zoomContainer" class="hidden absolute bottom-44 left-1/2 -translate-x-1/2 w-3/4 bg-black/40 backdrop-blur-sm px-4 py-3 rounded-full items-center gap-3 z-30 border border-white/30">
-      <i data-lucide="zoom-out" class="w-4 h-4 text-white flex-shrink-0"></i>
-      <input type="range" id="zoomSlider" oninput="handleZoom(event)" class="w-full">
-      <i data-lucide="zoom-in" class="w-4 h-4 text-white flex-shrink-0"></i>
+    <div id="zoomContainer" class="hidden items-center gap-2 touch-manipulation">
+      <button type="button" id="zoomOutBtn" aria-label="縮小" class="ctrl-round w-9 h-9">
+        <i data-lucide="minus" class="w-4 h-4"></i>
+      </button>
+      <input type="range" id="zoomSlider" aria-label="縮放倍率" class="flex-1 min-w-0">
+      <button type="button" id="zoomInBtn" aria-label="放大" class="ctrl-round w-9 h-9">
+        <i data-lucide="plus" class="w-4 h-4"></i>
+      </button>
+      <button type="button" id="zoomValue" aria-label="重設縮放" class="ctrl-round w-14 h-9 text-sm font-medium tabular-nums">1.0×</button>
     </div>
 
-    <!-- 一般連拍快門 -->
-    <button id="captureBtn" onclick="takePhoto()" 
-            class="absolute bottom-20 left-1/2 -translate-x-1/2 w-16 h-16 bg-white/90 backdrop-blur-sm rounded-full border-4 border-white flex items-center justify-center z-30 shadow-xl active:scale-95 transition-all">
-      <i data-lucide="camera" class="w-7 h-7 text-[#4a5553]"></i>
-    </button>
-
-    <!-- 手機原生相機備用方案 -->
-    <label for="nativeCameraInput" class="absolute bottom-20 right-4 w-14 h-14 bg-black/50 backdrop-blur-sm rounded-full flex flex-col items-center justify-center z-30 text-white border border-white/40 shadow-lg cursor-pointer active:scale-95 transition-all">
-      <i data-lucide="camera" class="w-5 h-5 text-white"></i>
-      <span class="text-[9px] mt-1 font-medium">原生相機</span>
-    </label>
-    <input type="file" id="nativeCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleNativePhoto(event)">
-  </div>
+    <!-- 閃光燈／快門／原生相機 -->
+    <div class="grid grid-cols-3 items-center touch-manipulation">
+      <div class="flex justify-center">
+        <button type="button" id="flashBtn" aria-label="閃光燈" aria-pressed="false" class="ctrl-btn invisible">
+          <span class="ctrl-round w-12 h-12"><i data-lucide="zap" class="w-5 h-5"></i></span>
+          <span class="ctrl-label">閃光燈</span>
+        </button>
+      </div>
+      <div class="flex justify-center">
+        <button type="button" id="captureBtn" aria-label="拍照" disabled class="shutter">
+          <span id="shutterCore" class="shutter-core"></span>
+        </button>
+      </div>
+      <div class="flex justify-center">
+        <label for="nativeCameraInput" id="nativeCameraBtn" role="button" tabindex="0" aria-label="使用手機原生相機" class="ctrl-btn cursor-pointer">
+          <span class="ctrl-round w-12 h-12"><i data-lucide="camera" class="w-5 h-5"></i></span>
+          <span class="ctrl-label">原生相機</span>
+        </label>
+        <input type="file" id="nativeCameraInput" accept="image/*" capture="environment" class="hidden">
+      </div>
+    </div>
+  </section>
 
   <!-- 拍攝歷史紀錄 -->
   <div class="flex-1 bg-white p-4 rounded-xl shadow-sm overflow-y-auto">
     <div class="flex items-center gap-2 mb-3 text-sm font-medium text-[#8b9693]">
       <i data-lucide="image" class="w-4 h-4"></i>
       <span>本次拍攝紀錄 (已自動下載至手機)</span>
+      <span id="photoCount" class="ml-auto text-xs tabular-nums hidden"></span>
     </div>
     <div id="gallery" class="grid grid-cols-3 gap-2">
       <!-- 縮圖會產生在這裡 -->
     </div>
   </div>
 
-  <!-- 隱藏的 Canvas 用於合成影像 -->
-  <canvas id="canvas" class="hidden"></canvas>
+  <!-- 拍完後再開啟助手整理相簿 -->
+  <section aria-label="工程相簿助手" class="bg-white p-4 rounded-xl shadow-sm flex flex-col gap-3">
+    <a id="openAlbumAssistant" href="engineeringalbum://upload" class="flex items-center justify-center gap-2 rounded-lg py-3 bg-[#7a8b85] text-white font-medium" aria-label="開啟工程相簿助手 App">
+      <i data-lucide="images" class="w-5 h-5" aria-hidden="true"></i>
+      <span>開啟工程相簿助手</span>
+    </a>
+    <p class="text-xs text-[#71807a] leading-relaxed">照片下載完成後開啟助手，依日期與店名分別建立 LINE 群組相簿。</p>
+    <a href="https://github.com/graceyiyo-cloud/date-stamp/releases/download/album-assistant-v0.1.16/engineering-album-assistant-0.1.16.apk" class="text-sm underline underline-offset-4 text-[#64796e]">下載／更新 Android 助手 APK（v0.1.16）</a>
+    <p class="text-xs text-[#71807a]">v0.1.15 起更換簽章：若已安裝 v0.1.10 以前的版本，請先移除舊版再安裝。</p>
+    <p id="albumAssistantHint" class="text-xs text-[#71807a] hidden" role="status"></p>
+  </section>
 
   <script>
     lucide.createIcons();
 
     let currentStatus = '洗前';
+    let stream = null;
     let videoTrack = null;
+    let cameraStarting = false;
+    let cameraWanted = false;
+    let autoResume = false;
     let isFlashOn = false;
-    
+    let torchSupported = false;
+    let zoomCaps = null;
+    let desiredZoom = null;
+    let constraintsDirty = false;
+    let applyingConstraints = false;
+    let pinchStart = null;
+    let lastShotAt = 0;
+    let photoCount = 0;
+
+    const STATUS_COLORS = { '洗前': '#a67c76', '洗後': '#6b8e85' };
+    const STAMP_COLORS = { '洗前': 'rgba(166, 124, 118, 0.85)', '洗後': 'rgba(107, 142, 133, 0.85)' };
+
     const video = document.getElementById('cameraFeed');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+    const previewFrame = document.getElementById('previewFrame');
     const cameraStatus = document.getElementById('cameraStatus');
+    const stampPreview = document.getElementById('stampPreview');
+    const captureBtn = document.getElementById('captureBtn');
+    const flashBtn = document.getElementById('flashBtn');
+    const zoomContainer = document.getElementById('zoomContainer');
+    const zoomSlider = document.getElementById('zoomSlider');
+    const zoomValue = document.getElementById('zoomValue');
+    const nativeCameraBtn = document.getElementById('nativeCameraBtn');
+    const nativeCameraInput = document.getElementById('nativeCameraInput');
 
     window.addEventListener('load', () => {
       document.getElementById('addressInput').value = '';
       document.getElementById('positionInput').value = '';
       const checkedFloor = document.querySelector('input[name="floor"]:checked');
       if(checkedFloor) checkedFloor.checked = false;
+      updateStampPreview();
       startCamera();
     });
+
+    function getLocationParts() {
+      const address = document.getElementById('addressInput').value.trim();
+      const floorInput = document.querySelector('input[name="floor"]:checked');
+      const floor = floorInput ? floorInput.value : '';
+      const position = document.getElementById('positionInput').value.trim();
+      const location = [address, floor, position].filter(Boolean).join(' ') || '未指定地點';
+      return { address, location };
+    }
+
+    // 取景框左下角顯示即將蓋上的狀態與地點，快門中心顏色跟著狀態變
+    function updateStampPreview() {
+      stampPreview.textContent = `${currentStatus}・${getLocationParts().location}`;
+      stampPreview.style.backgroundColor = STAMP_COLORS[currentStatus];
+      document.getElementById('shutterCore').style.backgroundColor = STATUS_COLORS[currentStatus];
+    }
+
+    document.getElementById('addressInput').addEventListener('input', updateStampPreview);
+    document.getElementById('positionInput').addEventListener('input', updateStampPreview);
+    document.querySelectorAll('input[name="floor"]').forEach(radio => radio.addEventListener('change', updateStampPreview));
 
     function setStatus(status) {
       currentStatus = status;
@@ -258,52 +392,153 @@
         btnBefore.className = 'flex-1 py-3 rounded-lg text-[#4a5553] font-medium transition-all bg-[#e2e5e4]';
         btnAfter.className = 'flex-1 py-3 rounded-lg text-white font-medium transition-all bg-[#6b8e85] shadow-md';
       }
+      updateStampPreview();
+    }
+
+    // ---------- 相機啟動／暫停 ----------
+    function showCameraMessage(text, canRetry) {
+      cameraStatus.textContent = text;
+      cameraStatus.disabled = !canRetry;
+      cameraStatus.classList.remove('hidden');
+    }
+
+    function hideCameraMessage() {
+      cameraStatus.classList.add('hidden');
+    }
+
+    function isCameraLive() {
+      return !!videoTrack && videoTrack.readyState === 'live';
     }
 
     async function startCamera() {
+      if (cameraStarting || isCameraLive()) return;
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showCameraMessage('此瀏覽器無法使用網頁相機，請改用「原生相機」。', false);
+        return;
+      }
+      cameraStarting = true;
+      cameraWanted = true;
+      showCameraMessage('載入相機中...', false);
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { 
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: {
             facingMode: { ideal: "environment" },
             width: { ideal: 1920 },
             height: { ideal: 1080 }
           },
           audio: false
         });
-        video.srcObject = stream;
+        if (!cameraWanted) {
+          // 等待期間已切換到原生相機，立即釋放
+          newStream.getTracks().forEach(track => track.stop());
+          return;
+        }
+        stream = newStream;
         videoTrack = stream.getVideoTracks()[0];
-        
-        video.onloadedmetadata = () => {
-          cameraStatus.style.display = 'none';
-          checkCameraCapabilities(); 
-        };
+        videoTrack.addEventListener('ended', handleTrackEnded);
+        autoResume = true;
+        video.srcObject = stream;
+        const playing = video.play();
+        if (playing && playing.catch) playing.catch(() => {});
       } catch (err) {
         console.error("相機存取失敗:", err);
-        cameraStatus.textContent = "無法存取相機，請確認瀏覽器權限。";
+        if (cameraWanted) showCameraMessage('無法存取相機，請確認瀏覽器權限。點一下重試', true);
+      } finally {
+        cameraStarting = false;
       }
     }
 
+    function releaseStream() {
+      if (stream) stream.getTracks().forEach(track => track.stop());
+      stream = null;
+      videoTrack = null;
+      video.srcObject = null;
+      captureBtn.disabled = true;
+      resetCameraControls();
+    }
+
+    // 開啟原生相機前先釋放鏡頭，避免回來後預覽變黑或原生相機打不開
+    function stopCamera() {
+      cameraWanted = false;
+      releaseStream();
+      showCameraMessage('相機已暫停，點一下重新啟動', true);
+    }
+
+    function handleTrackEnded(event) {
+      if (event.target !== videoTrack) return;
+      releaseStream();
+      showCameraMessage('相機已中斷，點一下重新啟動', true);
+    }
+
+    function resumeCamera() {
+      if (!autoResume || document.hidden) return;
+      startCamera();
+    }
+
+    cameraStatus.addEventListener('click', () => {
+      autoResume = true;
+      startCamera();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) resumeCamera();
+    });
+    window.addEventListener('focus', resumeCamera);
+
+    video.addEventListener('loadedmetadata', () => {
+      if (!isCameraLive()) return;
+      updatePreviewRatio();
+      hideCameraMessage();
+      captureBtn.disabled = false;
+      checkCameraCapabilities();
+    });
+    video.addEventListener('resize', updatePreviewRatio);
+
+    function updatePreviewRatio() {
+      if (video.videoWidth && video.videoHeight) {
+        previewFrame.style.setProperty('--ratio', (video.videoWidth / video.videoHeight).toFixed(4));
+      }
+    }
+
+    function resetCameraControls() {
+      isFlashOn = false;
+      torchSupported = false;
+      zoomCaps = null;
+      constraintsDirty = false;
+      pinchStart = null;
+      flashBtn.setAttribute('aria-pressed', 'false');
+      flashBtn.classList.add('invisible');
+      zoomContainer.classList.add('hidden');
+      zoomContainer.classList.remove('flex');
+    }
+
     function checkCameraCapabilities() {
-      if (!videoTrack) return;
+      const track = videoTrack;
+      if (!track) return;
       setTimeout(() => {
+        if (track !== videoTrack || !track.getCapabilities) return;
         try {
-          const capabilities = videoTrack.getCapabilities();
-          
-          const flashBtn = document.getElementById('flashBtn');
+          const capabilities = track.getCapabilities();
+
           if (capabilities.torch) {
-            flashBtn.classList.remove('hidden');
-            flashBtn.classList.add('flex');
+            torchSupported = true;
+            flashBtn.classList.remove('invisible');
           }
 
-          const zoomContainer = document.getElementById('zoomContainer');
-          const zoomSlider = document.getElementById('zoomSlider');
           if (capabilities.zoom) {
+            zoomCaps = capabilities.zoom;
+            zoomSlider.min = zoomCaps.min;
+            zoomSlider.max = zoomCaps.max;
+            zoomSlider.step = zoomCaps.step || 0.1;
             zoomContainer.classList.remove('hidden');
             zoomContainer.classList.add('flex');
-            zoomSlider.min = capabilities.zoom.min;
-            zoomSlider.max = capabilities.zoom.max;
-            zoomSlider.step = capabilities.zoom.step;
-            zoomSlider.value = capabilities.zoom.min;
+            if (desiredZoom !== null) {
+              // 從原生相機返回時沿用剛才的倍率
+              setZoom(desiredZoom);
+            } else {
+              const settings = track.getSettings ? track.getSettings() : {};
+              zoomSlider.value = settings.zoom || zoomCaps.min;
+              updateZoomLabel(zoomSlider.value);
+            }
           }
         } catch (e) {
           console.warn("無法取得相機進階功能", e);
@@ -311,37 +546,81 @@
       }, 500);
     }
 
-    async function toggleFlash() {
-      if (!videoTrack) return;
-      isFlashOn = !isFlashOn;
-      try {
-        await videoTrack.applyConstraints({
-          advanced: [{ torch: isFlashOn }]
-        });
-        const flashBtn = document.getElementById('flashBtn');
-        if (isFlashOn) {
-          flashBtn.className = 'absolute top-4 right-4 w-10 h-10 bg-white rounded-full flex items-center justify-center z-30 text-[#4a5553] shadow-md transition-colors';
-          flashBtn.innerHTML = '<i data-lucide="zap-off" class="w-5 h-5"></i>';
-        } else {
-          flashBtn.className = 'absolute top-4 right-4 w-10 h-10 bg-black/40 backdrop-blur-sm rounded-full flex items-center justify-center z-30 text-white border border-white/30 transition-colors';
-          flashBtn.innerHTML = '<i data-lucide="zap" class="w-5 h-5"></i>';
-        }
-        lucide.createIcons();
-      } catch (err) {
-        console.error('閃光燈切換失敗:', err);
-      }
+    // ---------- 閃光燈與縮放 ----------
+    // 同時送出縮放與閃光燈設定，避免調整縮放時把閃光燈關掉；連續拖動只套用最新值
+    function scheduleConstraints() {
+      constraintsDirty = true;
+      if (!applyingConstraints) flushConstraints();
     }
 
-    async function handleZoom(e) {
-      if (!videoTrack) return;
-      try {
-        await videoTrack.applyConstraints({
-          advanced: [{ zoom: parseFloat(e.target.value) }]
-        });
-      } catch (err) {
-        console.error('縮放失敗:', err);
+    async function flushConstraints() {
+      applyingConstraints = true;
+      while (constraintsDirty && videoTrack) {
+        constraintsDirty = false;
+        const track = videoTrack;
+        const settings = {};
+        if (zoomCaps && desiredZoom !== null) settings.zoom = desiredZoom;
+        if (torchSupported) settings.torch = isFlashOn;
+        if (!Object.keys(settings).length) continue;
+        try {
+          await track.applyConstraints({ advanced: [settings] });
+        } catch (err) {
+          console.error('相機設定失敗:', err);
+        }
       }
+      applyingConstraints = false;
     }
+
+    flashBtn.addEventListener('click', () => {
+      if (!torchSupported) return;
+      isFlashOn = !isFlashOn;
+      flashBtn.setAttribute('aria-pressed', String(isFlashOn));
+      scheduleConstraints();
+    });
+
+    function updateZoomLabel(value) {
+      zoomValue.textContent = `${Number(value).toFixed(1)}×`;
+    }
+
+    function setZoom(value) {
+      if (!zoomCaps) return;
+      zoomSlider.value = Math.min(zoomCaps.max, Math.max(zoomCaps.min, Number(value)));
+      desiredZoom = Number(zoomSlider.value);
+      updateZoomLabel(desiredZoom);
+      scheduleConstraints();
+    }
+
+    function zoomButtonStep() {
+      const span = zoomCaps ? zoomCaps.max - zoomCaps.min : 0;
+      if (span <= 3) return 0.25;
+      if (span <= 20) return 0.5;
+      return span / 40;
+    }
+
+    zoomSlider.addEventListener('input', () => setZoom(zoomSlider.value));
+    document.getElementById('zoomOutBtn').addEventListener('click', () => setZoom(Number(zoomSlider.value) - zoomButtonStep()));
+    document.getElementById('zoomInBtn').addEventListener('click', () => setZoom(Number(zoomSlider.value) + zoomButtonStep()));
+    zoomValue.addEventListener('click', () => {
+      if (zoomCaps) setZoom(Math.min(zoomCaps.max, Math.max(1, zoomCaps.min)));
+    });
+
+    // 取景框雙指縮放；單指仍可上下捲動頁面
+    function touchDistance(touches) {
+      return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY) || 1;
+    }
+    previewFrame.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 2 && zoomCaps) {
+        pinchStart = { distance: touchDistance(e.touches), zoom: Number(zoomSlider.value) };
+      }
+    }, { passive: true });
+    previewFrame.addEventListener('touchmove', (e) => {
+      if (!pinchStart || e.touches.length !== 2) return;
+      if (e.cancelable) e.preventDefault();
+      setZoom(pinchStart.zoom * touchDistance(e.touches) / pinchStart.distance);
+    }, { passive: false });
+    ['touchend', 'touchcancel'].forEach(type => previewFrame.addEventListener(type, (e) => {
+      if (e.touches.length < 2) pinchStart = null;
+    }));
 
     function getROCTimeString() {
       const now = new Date();
@@ -353,13 +632,35 @@
       return `民國${rocYear}年${month}月${date}日 ${hours}:${minutes}`;
     }
 
-    function processAndDownloadImage(sourceCanvas) {
-      const address = document.getElementById('addressInput').value.trim();
-      const floorInput = document.querySelector('input[name="floor"]:checked');
-      const floor = floorInput ? floorInput.value : '';
-      const position = document.getElementById('positionInput').value.trim();
-      
-      const location = [address, floor, position].filter(Boolean).join(' ') || '未指定地點';
+    // 非同步壓縮 JPEG，避免每拍一張畫面就卡住
+    function canvasToJpegDataUrl(sourceCanvas) {
+      return new Promise((resolve) => {
+        const fallback = () => resolve(sourceCanvas.toDataURL('image/jpeg', 0.9));
+        if (!sourceCanvas.toBlob) { fallback(); return; }
+        sourceCanvas.toBlob((blob) => {
+          if (!blob) { fallback(); return; }
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = fallback;
+          reader.readAsDataURL(blob);
+        }, 'image/jpeg', 0.9);
+      });
+    }
+
+    // 紀錄區只放小縮圖，拍很多張也不會越用越慢
+    function createThumbnail(sourceCanvas) {
+      const scale = Math.min(1, 320 / Math.min(sourceCanvas.width, sourceCanvas.height));
+      const thumb = document.createElement('canvas');
+      thumb.width = Math.max(1, Math.round(sourceCanvas.width * scale));
+      thumb.height = Math.max(1, Math.round(sourceCanvas.height * scale));
+      thumb.getContext('2d').drawImage(sourceCanvas, 0, 0, thumb.width, thumb.height);
+      return thumb.toDataURL('image/jpeg', 0.8);
+    }
+
+    async function processAndDownloadImage(sourceCanvas) {
+      const ctx = sourceCanvas.getContext('2d');
+      const status = currentStatus;
+      const { address, location } = getLocationParts();
       const timeStr = getROCTimeString();
 
       const fontSize = Math.max(Math.floor(sourceCanvas.width * 0.035), 24);
@@ -367,7 +668,7 @@
       const lineHeight = fontSize * 1.4;
       
       const textLines = [
-        `狀態：${currentStatus}`,
+        `狀態：${status}`,
         `地點：${location}`,
         `時間：${timeStr}`
       ];
@@ -384,7 +685,7 @@
       const startX = padding;
       const startY = sourceCanvas.height - boxHeight - padding;
 
-      if (currentStatus === '洗前') {
+      if (status === '洗前') {
         ctx.fillStyle = 'rgba(166, 124, 118, 0.85)';
       } else {
         ctx.fillStyle = 'rgba(107, 142, 133, 0.85)';
@@ -400,42 +701,75 @@
         ctx.fillText(line, startX + padding, startY + (padding/2) + (index * lineHeight) + 4);
       });
 
-      const photoDataUrl = sourceCanvas.toDataURL('image/jpeg', 0.9);
       const baseTime = timeStr.replace(/[\s:]/g, '');
       const uniqueMs = String(new Date().getMilliseconds()).padStart(3, '0');
       const uniqueFileName = `${baseTime}_${uniqueMs}`;
+      const thumbUrl = createThumbnail(sourceCanvas);
 
-      downloadAndDisplay(photoDataUrl, currentStatus, uniqueFileName, address);
+      try {
+        const photoDataUrl = await canvasToJpegDataUrl(sourceCanvas);
+        downloadAndDisplay(photoDataUrl, thumbUrl, status, uniqueFileName, address);
+      } catch (err) {
+        console.error('照片儲存失敗:', err);
+        alert('照片儲存失敗，請再拍一次。');
+      }
+    }
+
+    function playShutterFeedback() {
+      const flash = document.getElementById('shotFlash');
+      if (flash.animate) flash.animate([{ opacity: 0.75 }, { opacity: 0 }], { duration: 240, easing: 'ease-out' });
+      if (navigator.vibrate) navigator.vibrate(15);
     }
 
     function takePhoto() {
-      if (!video.videoWidth) return;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      processAndDownloadImage(canvas);
+      if (captureBtn.disabled || !video.videoWidth) return;
+      const now = Date.now();
+      if (now - lastShotAt < 350) return; // 避免誤觸連點拍出重複照片
+      lastShotAt = now;
+      const shot = document.createElement('canvas');
+      shot.width = video.videoWidth;
+      shot.height = video.videoHeight;
+      shot.getContext('2d').drawImage(video, 0, 0, shot.width, shot.height);
+      playShutterFeedback();
+      processAndDownloadImage(shot);
     }
+
+    captureBtn.addEventListener('click', takePhoto);
 
     function handleNativePhoto(event) {
       const file = event.target.files[0];
+      event.target.value = '';
+      resumeCamera();
       if (!file) return;
 
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const img = new Image();
-        img.onload = function() {
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          processAndDownloadImage(canvas);
-        };
-        img.src = e.target.result;
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = function() {
+        const shot = document.createElement('canvas');
+        shot.width = img.naturalWidth;
+        shot.height = img.naturalHeight;
+        shot.getContext('2d').drawImage(img, 0, 0, shot.width, shot.height);
+        URL.revokeObjectURL(url);
+        processAndDownloadImage(shot);
       };
-      reader.readAsDataURL(file);
-      event.target.value = '';
+      img.onerror = function() {
+        URL.revokeObjectURL(url);
+        alert('無法讀取這張照片，請再試一次。');
+      };
+      img.src = url;
     }
 
-    function downloadAndDisplay(dataUrl, status, uniqueFileName, storeName) {
+    nativeCameraBtn.addEventListener('click', stopCamera);
+    nativeCameraBtn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        nativeCameraBtn.click();
+      }
+    });
+    nativeCameraInput.addEventListener('change', handleNativePhoto);
+    nativeCameraInput.addEventListener('cancel', resumeCamera);
+
+    function downloadAndDisplay(dataUrl, thumbUrl, status, uniqueFileName, storeName) {
       const link = document.createElement('a');
       link.href = dataUrl;
       link.download = EngineeringPhotoNames.create(storeName, status, uniqueFileName);
@@ -448,7 +782,9 @@
       imgWrapper.className = 'aspect-square rounded-md overflow-hidden border border-[#e2e5e4] shadow-sm relative';
       
       const img = document.createElement('img');
-      img.src = dataUrl;
+      img.src = thumbUrl;
+      img.alt = `${status}照片`;
+      img.decoding = 'async';
       img.className = 'w-full h-full object-cover';
       
       const badgeColor = status === '洗前' ? 'bg-[#a67c76]' : 'bg-[#6b8e85]';
@@ -460,6 +796,11 @@
       imgWrapper.appendChild(badge);
       
       gallery.insertBefore(imgWrapper, gallery.firstChild);
+
+      photoCount += 1;
+      const countEl = document.getElementById('photoCount');
+      countEl.textContent = `${photoCount} 張`;
+      countEl.classList.remove('hidden');
     }
   </script>
 <script>
