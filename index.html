@@ -254,6 +254,8 @@
       <!-- 浮水印內容預覽（狀態＋地點） -->
       <div id="stampPreview" aria-hidden="true" class="pointer-events-none absolute left-2 bottom-2 z-10 max-w-[calc(100%-1rem)] truncate rounded-md px-2 py-1 text-xs font-medium text-white"></div>
       <div id="shotFlash" class="pointer-events-none absolute inset-0 z-10 bg-white opacity-0"></div>
+      <!-- 頁面內小提示（取代彈出視窗） -->
+      <div id="pageNotice" role="status" aria-live="polite" class="pointer-events-none absolute left-1/2 top-2 z-30 -translate-x-1/2 max-w-[calc(100%-1.5rem)] truncate rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-medium text-white opacity-0 transition-opacity duration-200"></div>
       <button id="cameraStatus" type="button" disabled class="absolute inset-0 z-20 flex items-center justify-center px-6 text-center text-white text-sm leading-relaxed bg-black">
         載入相機中...
       </button>
@@ -723,8 +725,17 @@
         downloadAndDisplay(photoDataUrl, thumbUrl, status, uniqueFileName, address);
       } catch (err) {
         console.error('照片儲存失敗:', err);
-        alert('照片儲存失敗，請再拍一次。');
+        showNotice('儲存失敗，請重拍', 3000);
       }
+    }
+
+    let noticeTimer = null;
+    function showNotice(text, duration = 1600) {
+      const notice = document.getElementById('pageNotice');
+      notice.textContent = text;
+      notice.classList.remove('opacity-0');
+      clearTimeout(noticeTimer);
+      noticeTimer = setTimeout(() => notice.classList.add('opacity-0'), duration);
     }
 
     function playShutterFeedback() {
@@ -766,7 +777,7 @@
       };
       img.onerror = function() {
         URL.revokeObjectURL(url);
-        alert('無法讀取這張照片，請再試一次。');
+        showNotice('讀取失敗，請重試', 3000);
       };
       img.src = url;
     }
@@ -813,6 +824,7 @@
       const countEl = document.getElementById('photoCount');
       countEl.textContent = `${photoCount} 張`;
       countEl.classList.remove('hidden');
+      showNotice(`已下載 ${photoCount}`);
     }
   </script>
 <script>
